@@ -60,3 +60,25 @@ jobs:
       - run: npm audit --audit-level=high
       - name: Type-check shared contracts
         run: ./node_modules/.bin/tsc -p ../../packages/contracts/tsconfig.json
+  research-reid:
+    # Requirement 004 research pipeline (not product code). Pipeline-correctness
+    # tests on synthetic fixtures only; no datasets or pretrained weights in CI.
+    # The CPU-only embedding group is installed so family B preprocessing/pinning
+    # tests run against a tiny locally-built model; HF_HUB_OFFLINE proves nothing
+    # is downloaded, and TOEM_REID_REQUIRE_EMBEDDING turns skips into failures.
+    runs-on: ubuntu-latest
+    env:
+      HF_HUB_OFFLINE: "1"
+      TOEM_REID_REQUIRE_EMBEDDING: "1"
+    defaults:
+      run:
+        working-directory: research/reid
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked --group embedding
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy
+      - run: uv run pytest
+      - run: uv run toem-reid budget configs/*.json

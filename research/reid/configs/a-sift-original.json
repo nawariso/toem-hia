@@ -1,0 +1,16 @@
+{
+  "config_id": "a-sift-original",
+  "algorithm_family": "A",
+  "model_identifier": "opencv-sift",
+  "model_version": "opencv-python-headless 5.0.0.93 (uv.lock)",
+  "preprocessing": "original",
+  "max_side": 768,
+  "training_config": null,
+  "seed": 0,
+  "parameters": {
+    "ratio": 0.8,
+    "max_features": 2000,
+    "ransac_threshold": 5.0,
+    "target_far": 0.05
+  }
+}

@@ -1,0 +1,65 @@
+[project]
+name = "toem-reid"
+version = "0.1.0"
+description = "TOEM HIA Requirement 004 Re-ID technical spike (research only; not product code)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy>=2.5.3",
+    "opencv-python-headless>=5.0.0.93",
+    "pillow>=12.3.0",
+]
+
+[project.scripts]
+toem-reid = "toem_reid.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers -p no:cacheprovider --basetemp=.pytest-tmp"
+
+[tool.coverage.run]
+branch = true
+source = ["toem_reid"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "PT", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.9",
+]
+embedding = [
+    "huggingface-hub>=0.36",
+    "timm>=1.0.30",
+    "torch>=2.14.0",
+    "torchvision>=0.29.0",
+]
+
+# CPU-only torch wheels: the spike must run without paid or dedicated GPU (section 23).
+# torch and torchvision must come from the same index: a PyPI (CUDA) torchvision
+# against a +cpu torch fails at import on Linux ("torchvision::nms does not exist").
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+torchvision = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
