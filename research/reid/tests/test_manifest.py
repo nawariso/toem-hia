@@ -194,7 +194,14 @@ def test_mobile_like_real_provenance_is_product_evidence(tmp_path: Path) -> None
     [
         ({"tier": "C"}, "tier must be A or B"),
         ({"license_or_permission": ""}, "license_or_permission is required"),
+        ({"license_or_permission": "UNKNOWN"}, "license_or_permission is not verified"),
+        (
+            {"license_or_permission": "pending permission review"},
+            "license_or_permission is not verified",
+        ),
+        ({"license_or_permission": "TBD"}, "license_or_permission is not verified"),
         ({"license_verified_on": ""}, "license_verified_on is required"),
+        ({"license_verified_on": "YYYY-MM-DD"}, "license_verified_on must be ISO"),
         ({"proxy": "yes"}, "proxy must be a boolean"),
         ({"tier": "B", "proxy": True}, "a proxy dataset cannot be tier B"),
         ({"species": ""}, "species is required"),

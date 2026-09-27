@@ -1,0 +1,20 @@
+{
+  "dataset_id": "kasetsart-water-monitor-pending-access",
+  "tier": "A",
+  "species": "Varanus salvator",
+  "source": "Non-Invasive Individual Re-Identification of Water Monitors (Varanus salvator) Using Deep Learning",
+  "source_reference": "https://doi.org/10.3390/d18090545",
+  "provider": null,
+  "received_date": null,
+  "permission_reference": null,
+  "license_or_permission": null,
+  "license_verified_on": null,
+  "redistribution_allowed": null,
+  "derived_artifacts_allowed": null,
+  "publication_allowed": null,
+  "identity_label_authority": null,
+  "side_semantics": "left/right are separate Side-IDs; individual mapping only if provider shares it",
+  "session_semantics": null,
+  "proxy": false,
+  "notes": "TEMPLATE ONLY. Do not ingest: unknown permission terms fail the existing provenance loader. Replace nulls only with documented provider responses; keep any restrictions outside public Git if terms require it. DSLR/telephoto research imagery is not automatically Tier B."
+}

@@ -7,7 +7,9 @@ be tier B and never counts toward product-feasibility gates C, D or E.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +69,20 @@ def load_provenance(path: Path) -> DatasetProvenance:
             "license_verified_on",
         )
     }
+    permission = texts["license_or_permission"].strip().casefold()
+    if permission and (
+        permission in {"none", "n/a", "not applicable", "-"}
+        or permission.startswith(("unknown", "pending", "tbd", "to be determined", "unverified"))
+    ):
+        errors.append("license_or_permission is not verified")
+    verified_on = texts["license_verified_on"]
+    if verified_on:
+        try:
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", verified_on) is None:
+                raise ValueError("not YYYY-MM-DD")
+            date.fromisoformat(verified_on)
+        except ValueError:
+            errors.append("license_verified_on must be ISO YYYY-MM-DD")
     tier = data.get("tier")
     if tier not in TIER_LABELS:
         errors.append("tier must be A or B")
