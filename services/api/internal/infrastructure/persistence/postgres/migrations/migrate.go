@@ -20,6 +20,12 @@ var wildlifeUp string
 //go:embed 000002_wildlife.down.sql
 var wildlifeDown string
 
+//go:embed 000003_media.up.sql
+var mediaUp string
+
+//go:embed 000003_media.down.sql
+var mediaDown string
+
 type migration struct {
 	version  int
 	name     string
@@ -31,6 +37,7 @@ type migration struct {
 var ordered = []migration{
 	{version: 1, name: "identity", up: identityUp, down: identityDown},
 	{version: 2, name: "wildlife", up: wildlifeUp, down: wildlifeDown},
+	{version: 3, name: "media", up: mediaUp, down: mediaDown},
 }
 
 // Latest is the newest migration version.
@@ -58,8 +65,9 @@ func UpTo(ctx context.Context, pool *pgxpool.Pool, version int) error {
 	return nil
 }
 
-// DownTo reverts every migration newer than version, newest first. DownTo(1)
-// reverts only the wildlife migration and keeps the identity schema and data.
+// DownTo reverts every migration newer than version, newest first. DownTo(2)
+// reverts only the media migration; DownTo(1) also reverts wildlife and keeps
+// the identity schema and data.
 func DownTo(ctx context.Context, pool *pgxpool.Pool, version int) error {
 	if err := checkVersion(version); err != nil {
 		return err

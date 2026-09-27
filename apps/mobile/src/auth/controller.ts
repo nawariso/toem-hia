@@ -32,6 +32,8 @@ export function createAuthController(auth: AuthProvider, api: ApiClient) {
         throw cause;
       }
     },
+    /** The current API credential, or null for a guest. Never persisted by callers. */
+    accessToken: () => auth.getAccessToken(),
     async restore() { const token = await auth.getAccessToken(); return token ? api.bootstrap(token) : null; },
     async updateProfile(patch: ProfileInput) { const token = await auth.getAccessToken(); if (!token) throw new Error('Authentication is required'); return api.updateMe(token, patch); },
     signOut: () => auth.signOut(),

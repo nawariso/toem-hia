@@ -6,7 +6,19 @@
     "orientation": "portrait",
     "scheme": "toemhia",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-router", ["expo-secure-store", { "configureAndroidBackup": true }]],
+    "plugins": [
+      "expo-router",
+      ["expo-secure-store", { "configureAndroidBackup": true }],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TOEM HIA uses the camera to photograph monitor lizards you observe. Photos stay private to your Hia Passport.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ]
+    ],
     "ios": { "supportsTablet": true, "bundleIdentifier": "com.toemhia.mobile", "config": { "usesNonExemptEncryption": false } },
     "android": { "package": "com.toemhia.mobile" },
     "web": { "bundler": "metro" }

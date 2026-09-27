@@ -3,11 +3,13 @@ package application
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/nawariso/toem-hia/services/api/internal/domain"
 	"github.com/nawariso/toem-hia/services/api/internal/domain/encounter"
 	"github.com/nawariso/toem-hia/services/api/internal/domain/hia"
 	"github.com/nawariso/toem-hia/services/api/internal/domain/location"
+	"github.com/nawariso/toem-hia/services/api/internal/domain/media"
 	"github.com/nawariso/toem-hia/services/api/internal/domain/park"
 )
 
@@ -93,4 +95,52 @@ type EncounterRepository interface {
 	// result and the location change in one transaction. mutate's error
 	// aborts the transaction.
 	Update(ctx context.Context, id string, mutate func(*encounter.Encounter) (LocationChange, error)) (encounter.Encounter, error)
+}
+
+// EncounterMedia is the Requirement 003 private photo use case the HTTP
+// transport depends on.
+type EncounterMedia interface {
+	Upload(ctx context.Context, identity domain.ExternalIdentity, encounterID, contentType string, body io.Reader) (MediaUpload, error)
+	List(ctx context.Context, identity domain.ExternalIdentity, encounterID string) ([]media.Media, error)
+	Content(ctx context.Context, identity domain.ExternalIdentity, mediaID string) (media.Media, io.ReadCloser, error)
+}
+
+// MediaRepository owns media metadata (Media module table only).
+type MediaRepository interface {
+	// Attach locks the encounter row, runs guard on it, and records m in the
+	// same transaction, so an encounter cannot leave DRAFT between the check
+	// and the insert. If the encounter already has a photo with the same
+	// SHA-256, that photo is returned with created=false and m is not stored
+	// (a retried upload is idempotent). More than max photos per encounter is
+	// refused with media.ErrTooManyPhotos.
+	Attach(ctx context.Context, m media.Media, max int, guard func(encounter.Encounter) error) (stored media.Media, created bool, err error)
+	ListByEncounter(ctx context.Context, encounterID string) ([]media.Media, error)
+	FindByID(ctx context.Context, id string) (media.Media, error)
+}
+
+// MediaStore keeps media bytes under server-generated keys. It is the
+// replaceable edge: the local filesystem adapter serves development and
+// tests, and a future object-storage adapter implements the same contract.
+// Application code never sees a filesystem path or bucket.
+type MediaStore interface {
+	// Stage copies at most limit bytes from r into a private temporary
+	// object while computing its size and SHA-256. More than limit bytes is
+	// media.ErrTooLarge and nothing is kept.
+	Stage(ctx context.Context, r io.Reader, limit int64) (StagedMedia, error)
+	// Open reads a published object. Keys must be media.ValidStorageKey.
+	Open(ctx context.Context, key string) (io.ReadCloser, error)
+	// Delete removes a published object; a missing object is not an error.
+	Delete(ctx context.Context, key string) error
+}
+
+// StagedMedia is an upload that has been received but not yet published.
+type StagedMedia interface {
+	Size() int64
+	SHA256() string
+	// Open reads the staged bytes, for validation before publishing.
+	Open() (io.ReadCloser, error)
+	// Commit atomically publishes the staged bytes under key.
+	Commit(ctx context.Context, key string) error
+	// Discard removes the staged bytes. It is safe after Commit (no-op).
+	Discard() error
 }

@@ -7,7 +7,7 @@ A fresh clone runs the mobile app, Go API, PostgreSQL, and authentication **with
 > **LOCAL AUTH IS DEVELOPMENT ONLY. IT MUST NEVER BE ENABLED IN PRODUCTION.**
 > `APP_ENV=production` + `AUTH_MODE=local` is a fatal startup error, and release mobile builds refuse local mode.
 
-Status: REQ-001, REQ-001-B and REQ-002 accepted. Native local-auth smoke on a device/emulator is **NOT RUN — deferred mandatory gate before Requirement 003**. Supabase Auth / Email OTP / real provider JWT are **DEFERRED TO INTEGRATION & PILOT HARDENING** — not tested end to end. See `docs/requirements/001B-local-development-mode.md`.
+Status: REQ-001, REQ-001-B and REQ-002 accepted; Requirement 003 is implemented pending independent review. Native local-auth smoke on a device/emulator is **NOT RUN**; the Requirement 003 camera flow is also **DEVICE VALIDATION — NOT RUN**. Both are mandatory before any public or user pilot. Supabase Auth / Email OTP / real provider JWT are **DEFERRED TO INTEGRATION & PILOT HARDENING** — not tested end to end. See `docs/requirements/001B-local-development-mode.md` and `docs/requirements/003-camera-local-media-foundation.md`.
 
 ## Architecture and cost
 
@@ -60,7 +60,7 @@ cp .env.example .env.local
 Edit `.env.local`:
 
 1. Replace the local database password placeholder in both `POSTGRES_PASSWORD` and `DATABASE_URL`.
-2. Keep `APP_ENV=development`, `AUTH_MODE=local`, `EXPO_PUBLIC_APP_ENV=development`, `EXPO_PUBLIC_AUTH_MODE=local`.
+2. Keep `APP_ENV=development`, `AUTH_MODE=local`, `MEDIA_MODE=local`, `EXPO_PUBLIC_APP_ENV=development`, `EXPO_PUBLIC_AUTH_MODE=local`. An existing `.env.local` from before Requirement 003 must gain `MEDIA_MODE` and `MEDIA_LOCAL_ROOT` (see `.env.example`); the API refuses to start without `MEDIA_MODE`.
 3. Set `EXPO_PUBLIC_API_URL` to this computer's LAN URL (for example `http://192.168.1.20:8080`) when testing on a physical phone. A phone cannot reach the computer through its own `localhost`.
 
 No Supabase value is needed in local mode. `.env.local` is ignored by Git. `.env.example` contains placeholders only.
@@ -75,6 +75,20 @@ No Supabase value is needed in local mode. `.env.local` is ignored by Git. `.env
 | missing / unknown | missing / unknown | Fatal startup error. No defaults, no fallback. |
 
 The local credential is a fixed, non-sensitive development string. The API still verifies it through `IdentityVerifier` and resolves the internal user through the normal bootstrap; the client never sends a user ID, role, or status. A Supabase-mode API rejects it.
+
+### Local media (Requirement 003)
+
+| `APP_ENV` | `MEDIA_MODE` | Result |
+| --- | --- | --- |
+| `development` / `test` | `local` | Starts. Photos are stored under `MEDIA_LOCAL_ROOT` on this computer (directories created `0700`; files created through `os.CreateTemp`, `0600` on Unix). |
+| any | `disabled` | Starts. Media routes answer `503 MEDIA_UNAVAILABLE`. |
+| `production` | `local` | **Fatal startup error.** |
+| missing / unknown | missing / unknown | Fatal startup error. No default. |
+
+- Local media is **development/test only**. It is a `MediaStore` adapter (ADR-010); a production media store is a later requirement.
+- No cloud media provider, bucket, or account is needed. Mandatory external runtime cost stays **$0/month**.
+- `MEDIA_LOCAL_ROOT` defaults nowhere; `.env.example` uses `.local/media` (relative to the directory the API starts from, Git-ignored). Deleting that directory while PostgreSQL still has `encounter_media` rows leaves those photos unreadable (`404` on content); reset both together.
+- Photos are private: only the owner can list them or read their bytes. Responses never contain a storage key, file path, device URI, EXIF, or location.
 
 ## 2. (Deferred) Configure Supabase email OTP
 
@@ -111,13 +125,15 @@ If you created the volume with the earlier stock `postgres:18.6-alpine` image, t
 From the repository root with `.env.local` loaded:
 
 ```bash
-go run ./services/api/cmd/migrate up          # apply all migrations (currently 000001, 000002)
-go run ./services/api/cmd/migrate down-to 1   # revert only the wildlife migration
+go run ./services/api/cmd/migrate up          # apply all migrations (currently 000001–000003)
+go run ./services/api/cmd/migrate down-to 2   # revert only the media migration
+go run ./services/api/cmd/migrate up
+go run ./services/api/cmd/migrate down-to 1   # revert media and wildlife; keep identity
 go run ./services/api/cmd/migrate up
 go run ./services/api/cmd/migrate down        # revert everything
 ```
 
-There is no version table; every up script is idempotent, so re-running `up` is safe. `000001_identity` creates `users`, `auth_identities`, and `user_roles`. `000002_wildlife` enables PostGIS and creates `parks`, `zones`, `hias`, `encounters`, and the private `encounter_locations` table; its down migration leaves identity data and the PostGIS extension in place.
+There is no version table; every up script is idempotent, so re-running `up` is safe. `000001_identity` creates `users`, `auth_identities`, and `user_roles`. `000002_wildlife` enables PostGIS and creates `parks`, `zones`, `hias`, `encounters`, and the private `encounter_locations` table. `000003_media` creates the private `encounter_media` metadata table with integrity constraints. Rolling back `000003` leaves wildlife and identity data intact; rolling back `000002` leaves identity data and the PostGIS extension in place. Rollbacks that drop photo metadata do not remove the media files.
 
 Load the development reference data (Lumpini Park with Lake Zone, North Path, South Pond; no Hias). It is idempotent and refuses any `APP_ENV` other than `development` or `test`:
 
@@ -179,6 +195,15 @@ Local-auth smoke test (the development runtime acceptance test):
 
 In Supabase mode (deferred) the same screen shows the email/OTP form instead and never shows **Continue as Dev User**. Supabase token auto-refresh starts only while React Native reports the app as active; backgrounding stops refresh, and provider unmount removes the AppState listener.
 
+Camera smoke test (Requirement 003; needs a real device or a simulator with a camera, and the API running with `MEDIA_MODE=local`):
+
+1. Home → **Scan a Hia** → allow the camera → the guidance and **Observe. Don’t Disturb.** are shown.
+2. Take a photo → preview with **Retake** and **Save Encounter**. Retake returns to the camera.
+3. As a guest, **Save Encounter** → **Create Your Hia Passport** → **Continue as Dev User** (→ Passport Setup the first time) → back on the same preview; the save resumes and ends at **Encounter saved**.
+4. Stop the API, take and save another photo → **Retry** is offered and the photo is kept; start the API, **Retry** → saved, and only one encounter exists.
+
+**DEVICE VALIDATION — NOT RUN.** Automated tests mock Expo Camera and FileSystem; the steps above have not been run on real camera hardware. They are mandatory before any public or user pilot.
+
 ## 7. Run checks
 
 Backend unit tests (integration tests skip only when `TEST_DATABASE_URL` is absent):
@@ -225,6 +250,7 @@ GitHub Actions runs the same gates with the same pinned PostgreSQL 18.6 + PostGI
 - `GET /v1/parks`, `GET /v1/parks/{id}`, `GET /v1/parks/{id}/zones` (public; ACTIVE only)
 - `GET /v1/hias[?parkId=]`, `GET /v1/hias/{publicCode}` (public; read-only)
 - `POST /v1/encounters`, `GET|PATCH /v1/encounters/{id}`, `POST /v1/encounters/{id}/submit`, `GET /v1/users/me/encounters` (Bearer credential; owner-only; writes require an `ACTIVE` user)
+- `POST /v1/encounters/{id}/media` (Bearer; raw JPEG/PNG body with matching `Content-Type`, ≤ 15 MiB, DRAFT encounters only, ≤ 5 photos; `201` new, `200` same bytes retried), `GET /v1/encounters/{id}/media`, `GET /v1/media/{id}/content` (Bearer; owner-only)
 
 See `packages/contracts/openapi.yaml`. Errors always use:
 
@@ -242,10 +268,11 @@ See `packages/contracts/openapi.yaml`. Errors always use:
 - SQL is parameterized and identity creation is one transaction.
 - Logs contain request ID, method, path, status, and duration, but not JWT, OTP, email, credentials, or precise location. Encounter events log only request ID, encounter ID, user ID, park ID, and status.
 - Precise encounter location is stored in a separate private table and is write-only through the API; responses expose park/zone only (ADR-008). Encounter writes are owner-only, server-derived, and allowed only for `ACTIVE` users.
+- Photos (ADR-010): the request body is capped at 15 MiB before it is read into anything and is streamed to a staging file; the real format is sniffed from the bytes and must match `Content-Type`; width/height are read from the header and bounded (12000 px per side, 50 MP) before any full decode; a full decode must then succeed. Storage keys are server-generated. Logs and responses never contain paths, storage keys, image bytes, EXIF, or location.
 - React and React DOM are pinned to Expo SDK 57's supported 19.2.3 baseline. Requirement 001 does not use React Server Components, so `react-server-dom-webpack` is not a direct dependency. React and React DOM have no `expo.install.exclude` exception; `npx expo install --check` validates them normally.
 - `govulncheck` reports **no vulnerabilities**. `pgx` is pinned to v5.9.2 and `golang.org/x/text` to v0.39.0 specifically to clear GO-2026-5004 (SQL injection via dollar-quoted placeholder confusion) and GO-2026-5970.
 - `npm audit --audit-level=high` passes. Thirteen **moderate** advisories remain inside Expo's own build toolchain (`@expo/cli` → `xcode` → `uuid`, and `expo-router` → `query-string` → `decode-uri-component`). `npm audit fix --force` "resolves" them by downgrading to Expo 46 / expo-router 5, which would abandon the SDK 57 baseline, so they are accepted and gated at `high` instead. They affect developer tooling, not the shipped app runtime.
 
 ## Current limits
 
-There is no deployed API/database, production SMTP, Apple/Google/LINE login, account-deletion workflow, camera/media, Re-ID, maps, notifications, or mobile wildlife screens (the app has Requirement 002 contract types only). Supabase Auth, Email OTP, and real provider JWT verification end to end are **DEFERRED TO INTEGRATION & PILOT HARDENING** and have not been tested against a real project; they are mandatory before any public beta or Lumpini pilot. Account deletion must be designed with future wildlife contribution-retention semantics before public beta or store release.
+There is no deployed API/database, production SMTP, Apple/Google/LINE login, account-deletion workflow, production media store, Re-ID, maps, or notifications. The mobile app has Scan a Hia (camera capture, preview, private photo upload) but no HiaDex, Explore, or identification results. Local media storage is development/test only (ADR-010). Supabase Auth, Email OTP, and real provider JWT verification end to end are **DEFERRED TO INTEGRATION & PILOT HARDENING** and have not been tested against a real project; they are mandatory before any public beta or Lumpini pilot. Account deletion must be designed with future wildlife contribution-retention semantics before public beta or store release.

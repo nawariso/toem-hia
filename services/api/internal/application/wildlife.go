@@ -274,19 +274,29 @@ func (s *EncounterService) Submit(ctx context.Context, identity domain.ExternalI
 
 // reader resolves the internal user through the identity boundary.
 func (s *EncounterService) reader(ctx context.Context, identity domain.ExternalIdentity) (domain.User, error) {
+	return readerUser(ctx, s.users, identity)
+}
+
+// writer additionally requires User.status = ACTIVE for protected writes.
+func (s *EncounterService) writer(ctx context.Context, identity domain.ExternalIdentity) (domain.User, error) {
+	return writerUser(ctx, s.users, identity)
+}
+
+// readerUser resolves the internal user through the identity boundary.
+func readerUser(ctx context.Context, users CurrentUserResolver, identity domain.ExternalIdentity) (domain.User, error) {
 	if err := domain.ValidateIdentity(identity); err != nil {
 		return domain.User{}, err
 	}
-	user, err := s.users.Current(ctx, identity)
+	user, err := users.Current(ctx, identity)
 	if errors.Is(err, ErrNotFound) {
 		return domain.User{}, ErrUserNotBootstrapped
 	}
 	return user, err
 }
 
-// writer additionally requires User.status = ACTIVE for protected writes.
-func (s *EncounterService) writer(ctx context.Context, identity domain.ExternalIdentity) (domain.User, error) {
-	user, err := s.reader(ctx, identity)
+// writerUser additionally requires User.status = ACTIVE.
+func writerUser(ctx context.Context, users CurrentUserResolver, identity domain.ExternalIdentity) (domain.User, error) {
+	user, err := readerUser(ctx, users, identity)
 	if err != nil {
 		return domain.User{}, err
 	}

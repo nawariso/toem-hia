@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../src/auth/AuthContext';
+import { pendingCapture } from '../src/capture/pending-capture';
 
 export default function PassportSetup() {
   const { state, error, updateProfile } = useAuth();
@@ -11,7 +12,11 @@ export default function PassportSetup() {
 
   useEffect(() => {
     if (state.status === 'GUEST') router.replace('/home');
-    else if (state.user?.profileComplete) router.replace('/profile');
+    else if (state.user?.profileComplete) {
+      // Finish a capture save the user started before setting up the passport.
+      if (pendingCapture.get()?.saveRequested) router.dismissTo('/scan');
+      else router.replace('/profile');
+    }
   }, [state]);
 
   const disabled = busy || username.length < 3 || !displayName.trim();

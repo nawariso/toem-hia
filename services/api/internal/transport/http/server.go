@@ -22,6 +22,7 @@ type Server struct {
 	parks      application.Parks
 	hias       application.Hias
 	encounters application.Encounters
+	media      application.EncounterMedia
 	logger     *slog.Logger
 	mux        *nethttp.ServeMux
 }
@@ -75,6 +76,7 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /v1/users/me", s.auth(nethttp.HandlerFunc(s.me)))
 	s.mux.Handle("PATCH /v1/users/me", s.auth(nethttp.HandlerFunc(s.update)))
 	s.wildlifeRoutes()
+	s.mediaRoutes()
 }
 func (s *Server) health(w nethttp.ResponseWriter, _ *nethttp.Request) {
 	writeJSON(w, nethttp.StatusOK, map[string]string{"status": "ok"})

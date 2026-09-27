@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useAuth } from '../src/auth/AuthContext';
-import { routeForState } from '../src/auth/state';
+import { routeAfterSignIn } from '../src/auth/state';
+import { pendingCapture } from '../src/capture/pending-capture';
 
 export default function Passport() {
   const { state, error, authMode, requestOtp, verifyOtp, signInDevelopmentUser } = useAuth();
@@ -12,7 +13,11 @@ export default function Passport() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (state.status === 'AUTHENTICATED') router.replace(routeForState(state));
+    if (state.status !== 'AUTHENTICATED') return;
+    // A guest who pressed Save on a capture goes back to that capture.
+    const route = routeAfterSignIn(state, pendingCapture.get()?.saveRequested === true);
+    if (route === '/scan') router.dismissTo('/scan');
+    else router.replace(route);
   }, [state]);
 
   if (authMode === 'local') {

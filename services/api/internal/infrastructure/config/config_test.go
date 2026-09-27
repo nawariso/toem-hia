@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -19,7 +20,7 @@ var supabaseSettings = map[string]string{
 // clearEnv isolates each test from the developer's shell environment.
 func clearEnv(t *testing.T) {
 	t.Helper()
-	for _, key := range []string{"APP_ENV", "AUTH_MODE", "HTTP_PORT", "DATABASE_URL", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL"} {
+	for _, key := range []string{"APP_ENV", "AUTH_MODE", "HTTP_PORT", "DATABASE_URL", "AUTH_ISSUER", "AUTH_AUDIENCE", "AUTH_JWKS_URL", "MEDIA_MODE", "MEDIA_LOCAL_ROOT"} {
 		t.Setenv(key, "")
 	}
 }
@@ -30,6 +31,7 @@ func setLocal(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("AUTH_MODE", "local")
 	t.Setenv("DATABASE_URL", databaseURL)
+	t.Setenv("MEDIA_MODE", "disabled")
 }
 
 func setSupabase(t *testing.T, appEnv string) {
@@ -38,6 +40,7 @@ func setSupabase(t *testing.T, appEnv string) {
 	t.Setenv("APP_ENV", appEnv)
 	t.Setenv("AUTH_MODE", "supabase")
 	t.Setenv("DATABASE_URL", databaseURL)
+	t.Setenv("MEDIA_MODE", "disabled")
 	for key, value := range supabaseSettings {
 		t.Setenv(key, value)
 	}
@@ -124,7 +127,7 @@ func TestSupabaseModeRejectsWhitespaceOnlyValues(t *testing.T) {
 }
 
 func TestModeAndEnvironmentHaveNoImplicitDefault(t *testing.T) {
-	for _, key := range []string{"APP_ENV", "AUTH_MODE", "DATABASE_URL"} {
+	for _, key := range []string{"APP_ENV", "AUTH_MODE", "DATABASE_URL", "MEDIA_MODE"} {
 		t.Run(key, func(t *testing.T) {
 			setLocal(t)
 			t.Setenv(key, "")
@@ -154,10 +157,84 @@ func TestReportsAllMissingValuesAtOnce(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected failure when no configuration is present")
 	}
-	for _, key := range []string{"APP_ENV", "AUTH_MODE", "DATABASE_URL"} {
+	for _, key := range []string{"APP_ENV", "AUTH_MODE", "DATABASE_URL", "MEDIA_MODE"} {
 		if !strings.Contains(err.Error(), key) {
 			t.Fatalf("error must list %s: %v", key, err)
 		}
+	}
+}
+
+// Requirement 003: local filesystem media is development/test only.
+func TestLocalMediaIsAllowedInDevelopmentAndTest(t *testing.T) {
+	for _, env := range []string{"development", "test"} {
+		t.Run(env, func(t *testing.T) {
+			setLocal(t)
+			t.Setenv("APP_ENV", env)
+			t.Setenv("MEDIA_MODE", "local")
+			t.Setenv("MEDIA_LOCAL_ROOT", filepath.Join(t.TempDir(), "media"))
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.MediaMode != config.MediaModeLocal || !filepath.IsAbs(cfg.MediaLocalRoot) {
+				t.Fatalf("unexpected media config: %+v", cfg)
+			}
+		})
+	}
+}
+
+func TestLocalMediaRootIsMadeAbsolute(t *testing.T) {
+	setLocal(t)
+	t.Setenv("MEDIA_MODE", "local")
+	t.Setenv("MEDIA_LOCAL_ROOT", "relative-media")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(cfg.MediaLocalRoot) || filepath.Base(cfg.MediaLocalRoot) != "relative-media" {
+		t.Fatalf("root not resolved to an absolute path: %q", cfg.MediaLocalRoot)
+	}
+}
+
+func TestLocalMediaIsForbiddenInProduction(t *testing.T) {
+	setSupabase(t, "production")
+	t.Setenv("MEDIA_MODE", "local")
+	t.Setenv("MEDIA_LOCAL_ROOT", t.TempDir())
+	if _, err := config.Load(); !errors.Is(err, config.ErrLocalMediaForbidden) {
+		t.Fatalf("production + MEDIA_MODE=local must fail startup, got %v", err)
+	}
+	hand := config.Config{AppEnv: "production", AuthMode: "supabase", HTTPPort: "8080", DatabaseURL: databaseURL,
+		AuthIssuer: "i", AuthAudience: "a", AuthJWKSURL: "j", MediaMode: "local", MediaLocalRoot: "/srv/media"}
+	if !errors.Is(hand.Validate(), config.ErrLocalMediaForbidden) {
+		t.Fatal("Validate must refuse production + local media even when Load was bypassed")
+	}
+}
+
+func TestLocalMediaRequiresARoot(t *testing.T) {
+	setLocal(t)
+	t.Setenv("MEDIA_MODE", "local")
+	if _, err := config.Load(); err == nil || !strings.Contains(err.Error(), "MEDIA_LOCAL_ROOT") {
+		t.Fatalf("MEDIA_MODE=local without a root must fail naming MEDIA_LOCAL_ROOT, got %v", err)
+	}
+}
+
+func TestProductionMayDisableMedia(t *testing.T) {
+	setSupabase(t, "production")
+	cfg, err := config.Load()
+	if err != nil || cfg.MediaMode != config.MediaModeDisabled {
+		t.Fatalf("production + MEDIA_MODE=disabled must start, got %+v %v", cfg, err)
+	}
+}
+
+func TestUnknownMediaModeFailsStartup(t *testing.T) {
+	for _, mode := range []string{"s3", "LOCAL", "none", "supabase"} {
+		t.Run(mode, func(t *testing.T) {
+			setLocal(t)
+			t.Setenv("MEDIA_MODE", mode)
+			if _, err := config.Load(); err == nil {
+				t.Fatalf("MEDIA_MODE=%q must fail startup", mode)
+			}
+		})
 	}
 }
 

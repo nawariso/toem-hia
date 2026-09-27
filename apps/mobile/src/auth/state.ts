@@ -32,3 +32,13 @@ export function reduceAuth(_state: AuthState, action: AuthAction): AuthState {
 export function routeForState(state: AuthState): '/home' | '/passport-setup' {
   return state.status === 'AUTHENTICATED' && state.user && !state.user.profileComplete ? '/passport-setup' : '/home';
 }
+
+/**
+ * Where a sign-in lands. Passport Setup still comes first for an incomplete
+ * profile; after that a guest who pressed Save on a capture returns to Scan
+ * to finish that save instead of being sent Home.
+ */
+export function routeAfterSignIn(state: AuthState, resumeCapture: boolean): '/home' | '/passport-setup' | '/scan' {
+  const route = routeForState(state);
+  return route === '/home' && resumeCapture ? '/scan' : route;
+}

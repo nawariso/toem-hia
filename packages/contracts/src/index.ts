@@ -80,3 +80,45 @@ export type CreateEncounterRequest = {
 
 /** Absent = unchanged; null clears the field. capturedAt cannot be null. */
 export type UpdateEncounterRequest = Partial<Omit<CreateEncounterRequest, 'capturedAt'>> & { capturedAt?: string };
+
+// Requirement 003 — camera & local media foundation.
+
+export type MediaContentType = 'image/jpeg' | 'image/png';
+export type MediaStatus = 'READY' | 'REJECTED';
+
+/**
+ * Private photo attached to one of the caller's encounters. There is no
+ * storage key, file path, device URI, EXIF, or location field: storage is an
+ * internal server detail, and precise location stays in the separate
+ * write-only encounter location.
+ *
+ * Upload: POST /v1/encounters/{id}/media with the raw image as the request
+ * body and Content-Type image/jpeg or image/png (201 created, 200 for a
+ * retried upload of the same bytes). Bytes: GET /v1/media/{id}/content.
+ */
+export type EncounterMedia = {
+  id: string;
+  encounterId: string;
+  kind: 'PHOTO';
+  status: MediaStatus;
+  visibility: 'PRIVATE';
+  contentType: MediaContentType;
+  byteSize: number;
+  width: number;
+  height: number;
+  sha256: string;
+  createdAt: string;
+};
+
+export type MediaErrorCode =
+  | 'MEDIA_TOO_LARGE'
+  | 'UNSUPPORTED_MEDIA_TYPE'
+  | 'INVALID_IMAGE'
+  | 'IMAGE_DIMENSIONS_EXCEEDED'
+  | 'MEDIA_LIMIT_REACHED'
+  | 'MEDIA_NOT_FOUND'
+  | 'MEDIA_UNAVAILABLE'
+  | 'ENCOUNTER_NOT_FOUND'
+  | 'ENCOUNTER_NOT_EDITABLE'
+  | 'USER_NOT_ACTIVE'
+  | 'USER_NOT_BOOTSTRAPPED';

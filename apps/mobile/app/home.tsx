@@ -13,10 +13,10 @@ export default function Home() {
         <Text style={styles.title}>Meet the Hia around you.</Text>
         <Text style={styles.body}>Help build a respectful record of the city&apos;s wild neighbours.</Text>
       </View>
-      <View style={styles.card}>
+      <Pressable accessibilityRole="button" style={styles.card} onPress={() => router.push('/scan')}>
         <Text style={styles.cardTitle}>Scan a Hia</Text>
-        <Text style={styles.coming}>COMING SOON</Text>
-      </View>
+        <Text style={styles.coming}>Photograph a monitor lizard you meet.</Text>
+      </Pressable>
       <Pressable style={styles.button} onPress={() => router.push(authenticated ? '/profile' : '/passport')}>
         <Text style={styles.buttonText}>{authenticated ? 'View Hia Passport' : 'Create Your Hia Passport'}</Text>
       </Pressable>

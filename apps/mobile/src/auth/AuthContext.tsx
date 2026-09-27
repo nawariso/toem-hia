@@ -1,6 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createApiClient } from '../api/client';
+import { createEncounterClient, type EncounterClient } from '../api/encounters';
+import { pendingCapture } from '../capture/pending-capture';
 import { readPublicEnv, resolveAuthConfig, type AuthConfig, type AuthMode } from '../config/auth-mode';
 import { createAuthController, type AuthController, type ProfileInput } from './controller';
 import { createLocalDevAuthProvider } from './local-dev-adapter';
@@ -19,6 +21,8 @@ type ContextValue = {
   error: string | null;
   /** The resolved auth mode, or null when configuration is invalid. */
   authMode: AuthMode | null;
+  /** Encounter/media API for the signed-in user, or null when configuration is invalid. */
+  encounters: EncounterClient | null;
   requestOtp(email: string): Promise<void>;
   verifyOtp(email: string, otp: string): Promise<void>;
   signInDevelopmentUser(): Promise<void>;
@@ -26,7 +30,7 @@ type ContextValue = {
   signOut(): Promise<void>;
 };
 
-type AuthServices = { controller: AuthController; supabase: SupabaseClient | null };
+type AuthServices = { controller: AuthController; supabase: SupabaseClient | null; encounters: EncounterClient };
 
 const AuthContext = createContext<ContextValue | null>(null);
 
@@ -35,10 +39,12 @@ const AuthContext = createContext<ContextValue | null>(null);
 function createAuthServices(config: AuthConfig): AuthServices {
   const api = createApiClient(config.apiUrl);
   if (config.mode === 'local') {
-    return { controller: createAuthController(createLocalDevAuthProvider(secureSessionStorage), api), supabase: null };
+    const controller = createAuthController(createLocalDevAuthProvider(secureSessionStorage), api);
+    return { controller, supabase: null, encounters: createEncounterClient(config.apiUrl, () => controller.accessToken()) };
   }
   const client = createSupabaseClient(config.supabaseUrl, config.supabasePublishableKey);
-  return { controller: createAuthController(createSupabaseAuthProvider(client), api), supabase: client };
+  const controller = createAuthController(createSupabaseAuthProvider(client), api);
+  return { controller, supabase: client, encounters: createEncounterClient(config.apiUrl, () => controller.accessToken()) };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -101,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       state,
       error,
       authMode: controller?.mode ?? null,
+      encounters: authServices?.encounters ?? null,
       requestOtp: (email) =>
         run(async () => {
           if (!controller) throw new Error(CONFIG_ERROR);
@@ -127,10 +134,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut: () =>
         run(async () => {
           if (controller) await controller.signOut();
+          // A capture belongs to whoever took it; do not carry it into the next session.
+          pendingCapture.discard();
           dispatch({ type: 'SIGNED_OUT' });
         }),
     }),
-    [controller, error, run, state],
+    [authServices, controller, error, run, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

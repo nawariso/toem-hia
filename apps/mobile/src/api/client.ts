@@ -1,8 +1,9 @@
 import type { ApiClient, ProfileInput } from '../auth/controller';
 import type { User } from '../auth/state';
+import { ApiError } from './errors';
 
 type ErrorPayload = { error?: { code?: string; message?: string; requestId?: string } };
-export class ApiError extends Error { constructor(public readonly code: string, message: string, public readonly requestId?: string) { super(message); } }
+export { ApiError };
 export function createApiClient(baseURL: string): ApiClient {
   if (!baseURL) throw new Error('EXPO_PUBLIC_API_URL is required');
   async function request(path: string, token: string, init: RequestInit = {}): Promise<User> {

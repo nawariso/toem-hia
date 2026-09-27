@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TOEM HIA API
-  version: 0.2.0
+  version: 0.3.0
 servers:
   - url: http://localhost:8080
 paths:
@@ -152,6 +152,65 @@ paths:
           description: Encounters owned by the caller
           content: { application/json: { schema: { $ref: '#/components/schemas/EncounterList' } } }
         '401': { $ref: '#/components/responses/Error' }
+  /v1/encounters/{id}/media:
+    post:
+      security: [{ bearerAuth: [] }]
+      summary: Attach a private photo to the caller's own DRAFT encounter
+      description: >-
+        The request body is the image itself (no multipart envelope, filename,
+        or path). The server sniffs and fully decodes the bytes, compares the
+        detected format with Content-Type, measures size, dimensions, and
+        SHA-256, and stores the original unmodified under a server-generated
+        key that is never returned. Uploading the same bytes to the same
+        encounter again returns the existing photo with 200. At most 5 photos
+        per encounter. Another user's encounter is 404. MEDIA_MODE=disabled
+        answers 503 MEDIA_UNAVAILABLE.
+      parameters: [{ $ref: '#/components/parameters/EncounterId' }]
+      requestBody:
+        required: true
+        content:
+          image/jpeg: { schema: { type: string, format: binary, maxLength: 15728640 } }
+          image/png: { schema: { type: string, format: binary, maxLength: 15728640 } }
+      responses:
+        '201': { $ref: '#/components/responses/EncounterMedia' }
+        '200': { $ref: '#/components/responses/EncounterMedia' }
+        '400': { description: 'INVALID_IMAGE or IMAGE_DIMENSIONS_EXCEEDED (max 12000 px per side, 50 MP)', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { description: USER_NOT_ACTIVE or USER_NOT_BOOTSTRAPPED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '404': { description: ENCOUNTER_NOT_FOUND (missing or owned by another user), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: ENCOUNTER_NOT_EDITABLE (not DRAFT) or MEDIA_LIMIT_REACHED, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '413': { description: MEDIA_TOO_LARGE (over 15 MiB), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '415': { description: UNSUPPORTED_MEDIA_TYPE (not JPEG/PNG, or content does not match Content-Type), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: MEDIA_UNAVAILABLE, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: The photos of one of the caller's own encounters (other users' encounters are 404)
+      parameters: [{ $ref: '#/components/parameters/EncounterId' }]
+      responses:
+        '200':
+          description: Private photos, oldest first. Cache-Control private, no-store.
+          content: { application/json: { schema: { $ref: '#/components/schemas/EncounterMediaList' } } }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /v1/media/{id}/content:
+    get:
+      security: [{ bearerAuth: [] }]
+      summary: The original bytes of one of the caller's own photos
+      description: >-
+        Owner-only. Another user's photo is 404 MEDIA_NOT_FOUND. Served with
+        Cache-Control private, no-store, X-Content-Type-Options nosniff, and a
+        sandboxing Content-Security-Policy.
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200':
+          description: Image bytes
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
 components:
   parameters:
     ParkId: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
@@ -302,7 +361,34 @@ components:
         behavior: { oneOf: [{ $ref: '#/components/schemas/EncounterBehavior' }, { type: 'null' }] }
         notes: { type: [string, 'null'], maxLength: 2000 }
         location: { oneOf: [{ $ref: '#/components/schemas/LocationInput' }, { type: 'null' }] }
+    EncounterMedia:
+      type: object
+      additionalProperties: false
+      description: >-
+        Private photo metadata. Every Requirement 003 photo is PRIVATE to the
+        encounter's observer. It deliberately has no storage key, filesystem
+        path, device URI, EXIF, or location field.
+      required: [id, encounterId, kind, status, visibility, contentType, byteSize, width, height, sha256, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        encounterId: { type: string, format: uuid }
+        kind: { type: string, enum: [PHOTO] }
+        status: { type: string, enum: [READY, REJECTED] }
+        visibility: { type: string, enum: [PRIVATE] }
+        contentType: { type: string, enum: [image/jpeg, image/png] }
+        byteSize: { type: integer, minimum: 1, maximum: 15728640 }
+        width: { type: integer, minimum: 1, maximum: 12000 }
+        height: { type: integer, minimum: 1, maximum: 12000 }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        createdAt: { type: string, format: date-time }
+    EncounterMediaList:
+      type: object
+      required: [items]
+      properties: { items: { type: array, items: { $ref: '#/components/schemas/EncounterMedia' } } }
   responses:
+    EncounterMedia:
+      description: One private photo (no storage key, path, EXIF, or location)
+      content: { application/json: { schema: { $ref: '#/components/schemas/EncounterMedia' } } }
     Encounter:
       description: One encounter owned by the caller (no precise location)
       content: { application/json: { schema: { $ref: '#/components/schemas/Encounter' } } }

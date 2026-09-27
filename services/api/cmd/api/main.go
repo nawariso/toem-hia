@@ -13,6 +13,7 @@ import (
 	"github.com/nawariso/toem-hia/services/api/internal/application"
 	"github.com/nawariso/toem-hia/services/api/internal/infrastructure/config"
 	"github.com/nawariso/toem-hia/services/api/internal/infrastructure/identity"
+	"github.com/nawariso/toem-hia/services/api/internal/infrastructure/media/localmedia"
 	persistence "github.com/nawariso/toem-hia/services/api/internal/infrastructure/persistence/postgres"
 	httptransport "github.com/nawariso/toem-hia/services/api/internal/transport/http"
 )
@@ -49,15 +50,33 @@ func main() {
 	repo := persistence.NewRepository(pool)
 	users := application.NewUserService(repo)
 	parkRepo := persistence.NewParkRepository(pool)
+	encounterRepo := persistence.NewEncounterRepository(pool)
 	wildlife := httptransport.WithWildlife(
 		application.NewParkService(parkRepo),
 		application.NewHiaService(persistence.NewHiaRepository(pool)),
-		application.NewEncounterService(users, parkRepo, persistence.NewEncounterRepository(pool)),
+		application.NewEncounterService(users, parkRepo, encounterRepo),
 	)
-	handler := httptransport.NewServer(users, verifier, repo, httptransport.WithLogger(logger), wildlife).Handler()
+	options := []httptransport.Option{httptransport.WithLogger(logger), wildlife}
+	switch cfg.MediaMode {
+	case config.MediaModeLocal:
+		store, storeErr := localmedia.New(cfg.MediaLocalRoot)
+		if storeErr != nil {
+			// The error can name the root; it is operator configuration, not
+			// user data, but it is still not echoed to clients.
+			logger.Error("media_store_unavailable", "media_mode", cfg.MediaMode)
+			os.Exit(1)
+		}
+		options = append(options, httptransport.WithMedia(
+			application.NewMediaService(users, encounterRepo, persistence.NewMediaRepository(pool), store)))
+		logger.Warn("local_media_storage_enabled", "media_mode", cfg.MediaMode, "environment", cfg.AppEnv,
+			"notice", "LOCAL MEDIA STORAGE IS DEVELOPMENT ONLY AND MUST NEVER BE ENABLED IN PRODUCTION")
+	default:
+		logger.Info("media_storage_disabled", "media_mode", cfg.MediaMode)
+	}
+	handler := httptransport.NewServer(users, verifier, repo, options...).Handler()
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second}
 	go func() {
-		logger.Info("api_started", "port", cfg.HTTPPort, "environment", cfg.AppEnv, "auth_mode", cfg.AuthMode)
+		logger.Info("api_started", "port", cfg.HTTPPort, "environment", cfg.AppEnv, "auth_mode", cfg.AuthMode, "media_mode", cfg.MediaMode)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("api_stopped", "error", err)
 			os.Exit(1)

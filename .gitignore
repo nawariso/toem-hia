@@ -21,3 +21,6 @@ bin/
 
 # Local database artifacts
 infra/docker/data/
+
+# Local development media (MEDIA_MODE=local); private photos, never committed
+.local/

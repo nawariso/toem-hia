@@ -5,11 +5,13 @@ import { render, waitFor, fireEvent, type RenderResult } from '@testing-library/
 // ES imports are hoisted above const initializers, so a jest.mock factory must
 // create its own mocks; the test reads them back from the mocked module.
 jest.mock('expo-router', () => ({
-  router: { replace: jest.fn(), push: jest.fn() },
+  router: { replace: jest.fn(), push: jest.fn(), dismissTo: jest.fn() },
   Stack: Object.assign(({ children }: { children?: React.ReactNode }) => children ?? null, {
     Screen: () => null,
   }),
 }));
+
+jest.mock('expo-file-system', () => jest.requireActual('./support/fake-file-system'));
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn().mockResolvedValue(null),
@@ -142,10 +144,10 @@ describe('guest state', () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/home'));
   });
 
-  it('shows the Coming Soon placeholder and passport wording, never "Register Account"', async () => {
+  it('shows the real Scan a Hia entry and passport wording, never "Register Account"', async () => {
     const view = await renderSettled(Home);
     expect(view.getByText('Scan a Hia')).toBeTruthy();
-    expect(view.getByText('COMING SOON')).toBeTruthy();
+    expect(view.queryByText('COMING SOON')).toBeNull();
     expect(view.getByText('Create Your Hia Passport')).toBeTruthy();
     expect(view.queryByText(/Register Account/i)).toBeNull();
   });
