@@ -1,6 +1,8 @@
 # Requirement 004B — evidence acquisition and validation readiness
 
-Status: PROPOSED / BLOCKED — DATA ACQUISITION. Research pipeline ACCEPTED (see `004-pipeline-acceptance.md`). Overall Requirement 004 Re-ID feasibility: INSUFFICIENT DATA — OPEN; Requirement 004 is NOT ACCEPTED.
+Status: ACCEPTED FOR EVIDENCE READINESS / BLOCKED — DATA ACQUISITION. Requirement 004 research pipeline: ACCEPTED (see `004-pipeline-acceptance.md`). Overall Requirement 004 Re-ID feasibility: INSUFFICIENT DATA — OPEN; Requirement 004 as a whole is NOT ACCEPTED.
+
+Independent review accepted PR #5 at `c7c84b09f35d8c1995fb8946c7cd7f8d3c249115`. Its normal merge commit is `15d12d447df0193e63f80840782199b3e5e634ee` (second parent is the reviewed head); push CI run `36302090627` passed backend, mobile and research-reid. This acceptance covers acquisition and validation readiness, not evidence collection or a feasibility result.
 
 | Track | Evidence class | Availability / action | Counts toward final Gates C/D/E? |
 | --- | --- | --- | --- |

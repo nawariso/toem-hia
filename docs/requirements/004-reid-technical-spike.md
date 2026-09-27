@@ -1,12 +1,13 @@
 # Requirement 004 — Re-ID Technical Spike
 
-Status: **PROPOSED / PIPELINE BUILT — INSUFFICIENT DATA**
+Status: **OPEN — RESEARCH PIPELINE ACCEPTED / 004B EVIDENCE READINESS ACCEPTED / RE-ID FEASIBILITY INSUFFICIENT DATA**. Completion blocker: **DATA ACQUISITION**.
 
 The research pipeline is **ACCEPTED** after PR #4's normal merge commit `89130438f60c8258da5c78f81b79a595aec65ab3` and green push CI (run `36297138908`: backend, mobile and research-reid SUCCESS). See `docs/research/reid/004-pipeline-acceptance.md`. The feasibility question stays open; Requirement 004 as a whole is **not** ACCEPTED.
 
 | Gate | Status |
 | --- | --- |
 | Research pipeline (manifest, leakage-safe sealed splits, metrics, open-set calibration, gates) | **ACCEPTED** — synthetic-fixture tests only; no feasibility conclusion |
+| Requirement 004B evidence acquisition and validation readiness | **ACCEPTED** — PR #5 merge `15d12d447df0193e63f80840782199b3e5e634ee`; data acquisition BLOCKED, no dataset or experiment |
 | Tier A controlled monitor-lizard dataset | **NOT AVAILABLE** |
 | Tier B mobile-like monitor-lizard dataset | **NOT AVAILABLE** |
 | Proxy dataset (another species, pipeline validation only) | SeaTurtleID2022 custom non-commercial terms reviewed; use in project context requires permission clarification before download. No data/experiment. |
