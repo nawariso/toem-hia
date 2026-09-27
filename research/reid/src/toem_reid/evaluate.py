@@ -50,6 +50,7 @@ RECORD_FIELDS: Final = (
     "algorithm_family",
     "model_identifier",
     "model_version",
+    "model_provenance",
     "preprocessing",
     "training_config",
     "seed",
@@ -256,6 +257,7 @@ def run_experiment(
     near_duplicates: Sequence[tuple[str, str]] = (),
     registered_configs: Sequence[str] = (),
     git_sha: str | None = None,
+    model_cache: Path | None = None,
 ) -> dict[str, Any]:
     if partition not in ("validation", "test"):
         raise EvaluationError("partition must be validation or test")
@@ -308,22 +310,23 @@ def run_experiment(
     if not gallery_ids or not known_ids or not unknown_ids:
         raise EvaluationError(f"{partition} needs gallery, known-query and unknown-query images")
 
-    matcher = build_matcher(config.algorithm_family, config.model_identifier, config.parameters)
+    matcher = build_matcher(config, model_cache)
     thresholds = QualityThresholds(**config.parameters.get("quality", {}))
     features: dict[str, Any] = {}
     quality: dict[str, str] = {}
     extract_ms: dict[str, float] = {}
     for image_id in sorted({*gallery_ids, *known_ids, *unknown_ids}):
         record = records[image_id]
+        # Head crop (if configured) always happens before any family-specific transform.
         image = apply_preprocessing(
             load_image(_image_file(store, record)),
             config.preprocessing,
             record.attributes.get("head_bbox"),
         )
-        gray = prepare(image, config.max_side)
-        quality[image_id] = assess(gray, thresholds).recommendation
+        # The quality signal is family-independent: a grayscale view of the same crop.
+        quality[image_id] = assess(prepare(image, config.max_side), thresholds).recommendation
         start = time.perf_counter()
-        features[image_id] = matcher.extract(gray)
+        features[image_id] = matcher.extract(matcher.prepare_input(image))
         extract_ms[image_id] = _elapsed_ms(start)
 
     gallery_features = [features[i] for i in gallery_ids]
@@ -386,6 +389,8 @@ def run_experiment(
         "unknown_quality": dict(sorted(_count(quality[i] for i in unknown_ids).items())),
     }
     record_path = results_dir / f"{experiment_id}.json"
+    model_provenance = matcher.provenance()
+    artifact = model_provenance.get("artifact")
     out: dict[str, Any] = {
         "experiment_id": experiment_id,
         "git_sha": git_sha if git_sha is not None else current_git_sha(manifest_path.parent),
@@ -400,6 +405,7 @@ def run_experiment(
         "algorithm_family": config.algorithm_family,
         "model_identifier": config.model_identifier,
         "model_version": config.model_version,
+        "model_provenance": model_provenance,
         "preprocessing": config.preprocessing,
         "training_config": config.training_config,
         "seed": config.seed,
@@ -430,6 +436,9 @@ def run_experiment(
         "calibration": sha256_file(calibration_path),
         "metrics": sha256_canonical(metrics),
     }
+    if artifact is not None:
+        out["artifact_hashes"]["model_weights"] = artifact["weights_sha256"]
+        out["artifact_hashes"]["model_revision"] = artifact["revision"]
     out["artifacts"] = {"record": str(record_path), "calibration": str(calibration_path)}
     record_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return out

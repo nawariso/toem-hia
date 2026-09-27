@@ -2,14 +2,26 @@
   "config_id": "b-megadescriptor-t224-head-crop",
   "algorithm_family": "B",
   "model_identifier": "hf-hub:BVRA/MegaDescriptor-T-224",
-  "model_version": "hub revision 3ea58ff6c6195bc748bb86c111ff40c32bdddcba observed 2026-09-27; CC BY-NC 4.0; not yet downloaded",
+  "model_version": "BVRA/MegaDescriptor-T-224@3ea58ff6c6195bc748bb86c111ff40c32bdddcba (swin_tiny_patch4_window7_224)",
   "preprocessing": "head_crop",
   "max_side": 512,
   "training_config": null,
   "seed": 0,
   "parameters": {
-    "input_size": 224,
     "device": "cpu",
     "target_far": 0.05
+  },
+  "model_artifact": {
+    "source": "huggingface",
+    "repo_id": "BVRA/MegaDescriptor-T-224",
+    "revision": "3ea58ff6c6195bc748bb86c111ff40c32bdddcba",
+    "config_file": "config.json",
+    "weights_file": "pytorch_model.bin",
+    "files": {
+      "config.json": "27ef9cc22f677980785e0778fada1bbc03a9f6a294333756f308638f2e83b86c",
+      "pytorch_model.bin": "62f53e6335d5f8ea4d764c91b442f8daa5ce7f316d388cc890e06c943218190c"
+    },
+    "license": "cc-by-nc-4.0",
+    "licence_scope": "RESEARCH-ONLY comparison (model card cc-by-nc-4.0; the embedded pretrained_cfg.license field says mit, the stricter model-card licence governs); not a production model candidate without a future licence decision"
   }
 }

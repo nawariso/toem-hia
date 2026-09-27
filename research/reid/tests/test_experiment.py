@@ -55,6 +55,25 @@ def test_config_loads_and_hash_is_stable(tmp_path: Path) -> None:
         ({"seed": "x"}, "seed"),
         ({"model_version": ""}, "model_version"),
         ({"algorithm_family": "C", "training_config": None}, "family C requires training_config"),
+        ({"algorithm_family": "B"}, "families B and C require a model_artifact pin"),
+        ({"model_artifact": {"source": "huggingface", "revision": "main"}}, "40-hex commit"),
+        (
+            {
+                "algorithm_family": "B",
+                "model_identifier": "hf-hub:someone/else",
+                "model_artifact": {
+                    "source": "huggingface",
+                    "repo_id": "example/backbone",
+                    "revision": "a" * 40,
+                    "config_file": "config.json",
+                    "weights_file": "config.json",
+                    "files": {"config.json": "b" * 64},
+                    "license": "apache-2.0",
+                    "licence_scope": "research comparison",
+                },
+            },
+            "model_identifier must be 'hf-hub:example/backbone'",
+        ),
     ],
 )
 def test_invalid_configs_are_refused(
@@ -78,14 +97,25 @@ def test_budget_refuses_a_fourth_config_in_one_family(tmp_path: Path) -> None:
 
 
 def test_budget_refuses_more_than_one_fine_tuned_model_family(tmp_path: Path) -> None:
+    pin = {
+        "source": "huggingface",
+        "repo_id": "example/backbone",
+        "revision": "a" * 40,
+        "config_file": "config.json",
+        "weights_file": "model.safetensors",
+        "files": {"config.json": "b" * 64, "model.safetensors": "c" * 64},
+        "license": "apache-2.0",
+        "licence_scope": "research comparison",
+    }
     configs = [
         load_config(
             _write(
                 tmp_path,
                 "c1",
                 algorithm_family="C",
-                model_identifier="arcface-swin",
-                training_config={"epochs": 5},
+                model_identifier="hf-hub:example/backbone",
+                training_config={"epochs": 5, "loss": "arcface"},
+                model_artifact=pin,
             )
         ),
         load_config(
@@ -93,8 +123,9 @@ def test_budget_refuses_more_than_one_fine_tuned_model_family(tmp_path: Path) ->
                 tmp_path,
                 "c2",
                 algorithm_family="C",
-                model_identifier="triplet-resnet",
-                training_config={"epochs": 5},
+                model_identifier="hf-hub:example/other",
+                training_config={"epochs": 5, "loss": "triplet"},
+                model_artifact={**pin, "repo_id": "example/other"},
             )
         ),
     ]

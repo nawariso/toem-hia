@@ -22,12 +22,14 @@ from typing import Any, Final
 
 from toem_reid.hashing import sha256_canonical
 from toem_reid.images import PREPROCESSING
+from toem_reid.models import parse_pin
 
 FAMILIES: Final = {
     "A": "classical local features",
     "B": "general pretrained visual embedding",
     "C": "metric-learning / Re-ID fine-tuning",
 }
+PRETRAINED_FAMILIES: Final = frozenset({"B", "C"})
 MAX_CONFIGS_PER_FAMILY: Final = 3
 
 
@@ -50,6 +52,7 @@ class ExperimentConfig:
     training_config: dict[str, Any] | None
     seed: int
     parameters: dict[str, Any]
+    model_artifact: dict[str, Any] | None = None
 
     def material(self) -> dict[str, Any]:
         """Everything that affects results; ``config_id`` is only a label."""
@@ -86,6 +89,23 @@ def load_config(path: Path) -> ExperimentConfig:
     parameters = data.get("parameters", {})
     if not isinstance(parameters, dict):
         errors.append("parameters must be an object")
+    artifact = data.get("model_artifact")
+    if data.get("algorithm_family") in PRETRAINED_FAMILIES and artifact is None:
+        errors.append(
+            "families B and C require a model_artifact pin (immutable revision + file SHA-256)"
+        )
+    if artifact is not None:
+        if not isinstance(artifact, dict):
+            errors.append("model_artifact must be an object")
+        else:
+            try:
+                pin = parse_pin(artifact)
+            except ValueError as error:
+                errors.append(str(error))
+            else:
+                expected = f"hf-hub:{pin.repo_id}"
+                if data.get("model_identifier") != expected:
+                    errors.append(f"model_identifier must be {expected!r} to match model_artifact")
     if errors:
         raise ValueError(f"{path.name}: " + "; ".join(errors))
     return ExperimentConfig(
@@ -98,6 +118,7 @@ def load_config(path: Path) -> ExperimentConfig:
         training_config=training,
         seed=seed,
         parameters=parameters,
+        model_artifact=artifact,
     )
 
 

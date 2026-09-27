@@ -114,9 +114,15 @@ def test_cli_end_to_end_on_synthetic_proxy_is_insufficient_data(
         )
         == 0
     )
-    outcome = json.loads(decision.read_text(encoding="utf-8"))["outcome"]
+    payload = json.loads(decision.read_text(encoding="utf-8"))
+    outcome = payload["outcome"]
     assert outcome["decision"] == "INSUFFICIENT DATA"
     assert "PROXY" in outcome["reasons"][0]
+    assert outcome["policy"]["min_known_recall_after_threshold"] == 0.70
+    assert outcome["policy"]["far_near_miss_ceiling"] == 0.075
+    assert outcome["policy"]["far_ci95_exclusion_ceiling"] == 0.10
+    assert outcome["policy"]["tier_b_minimums"]["unseen_side_ids"] == 20
+    assert len(payload["input"]["far_ci95"]) == 2
 
 
 def test_cli_scale_and_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -137,3 +143,78 @@ def test_long_error_lists_are_bounded() -> None:
     assert _bounded("a; b") == "a; b"
     long = "; ".join(f"e{i}" for i in range(25))
     assert _bounded(long).endswith("e9; ... (+15 more)")
+
+
+def test_fetch_model_verifies_pinned_artifact_and_refuses_unpinned_configs(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import toem_reid.cli as cli_module
+    from toem_reid.hashing import sha256_file
+    from toem_reid.models import acquire as real_acquire
+
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    (upstream / "config.json").write_text(
+        json.dumps(
+            {
+                "architecture": "test_vit",
+                "pretrained_cfg": {"input_size": [3, 64, 64], "interpolation": "bicubic"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (upstream / "model.safetensors").write_bytes(b"weights")
+    revision = "1" * 40
+    config = {
+        "config_id": "b-local",
+        "algorithm_family": "B",
+        "model_identifier": "hf-hub:local/model",
+        "model_version": f"local/model@{revision}",
+        "preprocessing": "head_crop",
+        "max_side": 256,
+        "training_config": None,
+        "seed": 0,
+        "parameters": {},
+        "model_artifact": {
+            "source": "huggingface",
+            "repo_id": "local/model",
+            "revision": revision,
+            "config_file": "config.json",
+            "weights_file": "model.safetensors",
+            "files": {n: sha256_file(upstream / n) for n in ("config.json", "model.safetensors")},
+            "license": "test-fixture",
+            "licence_scope": "tests only",
+        },
+    }
+    config_path = tmp_path / "b-local.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    def offline_hub(
+        *, repo_id: str, filename: str, revision: str, cache_dir: str, local_files_only: bool
+    ) -> str:
+        return str(upstream / filename)
+
+    monkeypatch.setattr(
+        cli_module,
+        "acquire",
+        lambda pin, cache, allow_download: real_acquire(
+            pin, cache, allow_download=allow_download, downloader=offline_hub
+        ),
+    )
+    cache = tmp_path / "cache"
+    assert main(["fetch-model", "--config", str(config_path), "--model-cache", str(cache)]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["artifact"]["revision"] == revision
+    assert printed["artifact"]["verified"] is True
+    assert printed["preprocessing"]["input_size"] == [3, 64, 64]
+
+    sift = tmp_path / "a.json"
+    sift.write_text(
+        json.dumps(
+            {**config, "algorithm_family": "A", "model_identifier": "opencv-sift"}
+            | {"model_artifact": None}
+        ),
+        encoding="utf-8",
+    )
+    assert main(["fetch-model", "--config", str(sift), "--model-cache", str(cache)]) == 2
+    assert "nothing to fetch" in capsys.readouterr().err

@@ -8,6 +8,8 @@ Commands mirror the protocol order:
   decide    apply gates A-E to a sealed TEST record
   scale     synthetic-vector index/search mechanics (never accuracy evidence)
   budget    check configs against the section 6 experiment budget
+  fetch-model download a config's pinned model revision into a cache outside Git
+            and verify every file's SHA-256 (the only command that downloads)
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ from toem_reid.evaluate import compare_metrics, run_experiment, scaling_benchmar
 from toem_reid.experiment import check_budget, load_config
 from toem_reid.ingest import ingest
 from toem_reid.manifest import load_manifest, manifest_sha256
+from toem_reid.matchers import pretrained_cfg_summary, resolve_model_cache
+from toem_reid.models import acquire, parse_pin
 from toem_reid.splits import SplitParameters, build_diagnostic_split, build_split, verify_split
 
 
@@ -110,6 +114,7 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         partition=args.partition,
         seal_log=args.seal_log or args.results / "sealed-test-log.jsonl",
         near_duplicates=_near_duplicates(args.phash, args.max_hamming),
+        model_cache=args.model_cache,
     )
     closed = record["metrics"]["closed_set"]
     open_set = record["metrics"]["open_set"]
@@ -148,6 +153,7 @@ def cmd_reproduce(args: argparse.Namespace) -> int:
         partition="validation",
         seal_log=args.results / "sealed-test-log.jsonl",
         near_duplicates=_near_duplicates(args.phash, args.max_hamming),
+        model_cache=args.model_cache,
     )
     diffs = compare_metrics(first["metrics"], rerun["metrics"], args.tolerance)
     print(json.dumps({"reproducible": not diffs, "differences": diffs[:20]}, indent=2))
@@ -174,6 +180,7 @@ def cmd_decide(args: argparse.Namespace) -> int:
         "top1": closed["top_k"]["1"]["rate"],
         "top5": closed["top_k"]["5"]["rate"],
         "far": open_set["unknown_false_accept"]["rate"],
+        "far_ci95": open_set["unknown_false_accept"]["ci95"],
         "known_top5_after_threshold": open_set["known_top_k_after_threshold"]["5"]["rate"],
         "diagnostic_top5": diagnostic["metrics"]["closed_set"]["top_k"]["5"]["rate"]
         if diagnostic
@@ -198,6 +205,29 @@ def cmd_scale(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_fetch_model(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    if config.model_artifact is None:
+        raise ValueError(f"{args.config.name} has no model_artifact pin; nothing to fetch")
+    resolved = acquire(
+        parse_pin(config.model_artifact),
+        resolve_model_cache(args.model_cache),
+        allow_download=True,
+    )
+    print(
+        json.dumps(
+            {
+                "config_id": config.config_id,
+                "artifact": resolved.record(),
+                "preprocessing": pretrained_cfg_summary(resolved.config_path),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return 0
+
+
 def cmd_budget(args: argparse.Namespace) -> int:
     check_budget([load_config(p) for p in args.configs])
     print("within the Requirement 004 experiment budget")
@@ -213,6 +243,7 @@ def _common_eval(p: argparse.ArgumentParser) -> None:
     p.add_argument("--results", type=Path, required=True)
     p.add_argument("--phash", type=Path)
     p.add_argument("--max-hamming", type=int, default=4)
+    p.add_argument("--model-cache", type=Path, help="pinned model cache outside Git (families B/C)")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -274,6 +305,11 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser("budget")
     p.add_argument("configs", type=Path, nargs="+")
     p.set_defaults(func=cmd_budget)
+
+    p = sub.add_parser("fetch-model")
+    p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--model-cache", type=Path)
+    p.set_defaults(func=cmd_fetch_model)
     return root
 
 

@@ -46,6 +46,16 @@ dev = [
     "ruff>=0.16.9",
 ]
 embedding = [
+    "huggingface-hub>=0.36",
     "timm>=1.0.30",
     "torch>=2.14.0",
 ]
+
+# CPU-only torch wheels: the spike must run without paid or dedicated GPU (section 23).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

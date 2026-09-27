@@ -126,6 +126,31 @@ def test_validation_run_writes_a_complete_record_and_calibration(
     assert calibration_path.is_file()
     assert record["artifact_hashes"]["calibration"]
     assert "similarity is not a probability" in record["score_semantics"]
+    assert record["model_provenance"]["input"] == "grayscale"
+    assert "model_weights" not in record["artifact_hashes"]
+
+
+def test_pretrained_record_carries_model_revision_and_weight_hash(
+    workspace: dict[str, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import toem_reid.evaluate as evaluate_module
+    from toem_reid.matchers import SiftMatcher
+
+    artifact = {"revision": "f" * 40, "weights_sha256": "e" * 64, "repo_id": "x/y"}
+
+    class PinnedSift(SiftMatcher):
+        def provenance(self) -> dict[str, Any]:
+            return {**super().provenance(), "artifact": artifact}
+
+    monkeypatch.setattr(
+        evaluate_module,
+        "build_matcher",
+        lambda config, model_cache=None: PinnedSift(0.8, 500, 5.0, config.max_side),
+    )
+    record = _run(workspace, "validation", "r-pinned")
+    assert record["model_provenance"]["artifact"] == artifact
+    assert record["artifact_hashes"]["model_weights"] == "e" * 64
+    assert record["artifact_hashes"]["model_revision"] == "f" * 40
 
 
 def test_synthetic_pipeline_retrieves_known_patterns(workspace: dict[str, Path]) -> None:

@@ -6,7 +6,9 @@ Requirement record and current status: `docs/requirements/004-reid-technical-spi
 
 ## Rules that the tooling enforces
 
-- Raw and derived imagery, model weights and feature caches stay **outside Git**. Keep them under a directory such as `%USERPROFILE%\toem-reid-data` (set `TOEM_REID_DATA`); `.gitignore` is only a second line of defence.
+- Raw and derived imagery, model weights and feature caches stay **outside Git**. Keep them under a directory such as `%USERPROFILE%\toem-reid-data` (set `TOEM_REID_DATA`, and `TOEM_REID_MODEL_CACHE` for pretrained models); `.gitignore` is only a second line of defence.
+- Pretrained models (families B/C) are pinned in the config's `model_artifact`: an immutable 40-hex upstream revision plus the SHA-256 of `config.json` and the weights file. `toem-reid fetch-model` is the only command that downloads. Evaluation loads strictly from the verified local cache, re-hashes every file, and fails on any mismatch or on weights that do not load exactly into the backbone. The revision and weight hash are written into every experiment record.
+- Each family prepares its own input after the head crop: family A gets grayscale for SIFT; family B gets the RGB crop through the pinned model's canonical evaluation transform (input size, interpolation, resize/centre-crop, mean/std from its `config.json`). A grayscale embedding experiment would have to be a separately declared configuration.
 - Every dataset has a provenance file. A dataset from another species must set `"proxy": true`. Its results are labelled `PROXY — PIPELINE VALIDATION ONLY` and can never pass Gates C, D or E.
 - Location, user and device columns are refused in labels and manifests; GPS/EXIF (except orientation) is never read.
 - Splits are session-disjoint and sealed. A split file is never overwritten. The UNKNOWN threshold is calibrated on VALIDATION only; the TEST partition reuses it unchanged and is registered in an append-only log before any test metric is computed.
@@ -20,7 +22,7 @@ Python 3.13 via `uv` (pinned in `.python-version`, locked in `uv.lock`):
 ```bash
 cd research/reid
 uv sync --locked                    # core + dev tools, CPU only
-uv sync --locked --group embedding  # optional: timm + torch for family B
+uv sync --locked --group embedding  # optional: timm + CPU-only torch for family B
 ```
 
 Quality gates (same as CI job `research-reid`):
@@ -29,6 +31,17 @@ Quality gates (same as CI job `research-reid`):
 uv run ruff format --check . && uv run ruff check . && uv run mypy && uv run pytest
 uv run toem-reid budget configs/*.json
 ```
+
+These gates need no dataset and no pretrained weights. Without the `embedding` group, the family B tests are skipped locally. CI installs the group, runs offline (`HF_HUB_OFFLINE=1`), and fails instead of skipping (`TOEM_REID_REQUIRE_EMBEDDING=1`).
+
+Pretrained model artifacts (families B/C, before their first evaluation):
+
+```bash
+uv run toem-reid fetch-model --config configs/b-dinov2-small-head-crop.json \
+  --model-cache "$TOEM_REID_MODEL_CACHE"
+```
+
+The command prints the verified revision, file hashes and the canonical preprocessing. `evaluate` / `reproduce` take the same `--model-cache` (or the environment variable) and never download.
 
 ## Procedure
 
@@ -90,7 +103,7 @@ uv run toem-reid budget configs/*.json
    uv run toem-reid evaluate --partition test ...   # same arguments as step 5
    ```
 
-8. Decision: `uv run toem-reid decide --test-record results/<test-record>.json --diagnostic-record results/<diagnostic-record>.json --reproducible --out reports/decision.json`.
+8. Decision: `uv run toem-reid decide --test-record results/<test-record>.json --diagnostic-record results/<diagnostic-record>.json --reproducible --out reports/decision.json`. The complete decision policy (GO: Top-5 ≥ 0.80, FAR ≤ 0.05, known Top-5 after threshold ≥ 0.70; single near miss: Top-5 ≥ 0.70 or FAR ≤ 0.075; downgrade if the FAR 95 % upper bound exceeds 0.10) is written into the decision file.
 
 9. Scaling mechanics (synthetic vectors only): `uv run toem-reid scale --out reports/scaling-synthetic.json`.
 

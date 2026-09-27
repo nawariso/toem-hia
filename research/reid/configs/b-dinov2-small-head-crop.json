@@ -1,15 +1,27 @@
 {
   "config_id": "b-dinov2-small-head-crop",
   "algorithm_family": "B",
-  "model_identifier": "vit_small_patch14_dinov2.lvd142m",
-  "model_version": "hub timm/vit_small_patch14_dinov2.lvd142m revision 4610ca143709d58a633b6397a74412c2c3842454 observed 2026-09-27; Apache-2.0; not yet downloaded",
+  "model_identifier": "hf-hub:timm/vit_small_patch14_dinov2.lvd142m",
+  "model_version": "timm/vit_small_patch14_dinov2.lvd142m@4610ca143709d58a633b6397a74412c2c3842454 (vit_small_patch14_dinov2)",
   "preprocessing": "head_crop",
   "max_side": 518,
   "training_config": null,
   "seed": 0,
   "parameters": {
-    "input_size": 518,
     "device": "cpu",
     "target_far": 0.05
+  },
+  "model_artifact": {
+    "source": "huggingface",
+    "repo_id": "timm/vit_small_patch14_dinov2.lvd142m",
+    "revision": "4610ca143709d58a633b6397a74412c2c3842454",
+    "config_file": "config.json",
+    "weights_file": "model.safetensors",
+    "files": {
+      "config.json": "b651fc1b08edf7d1c15a121cbb3270c802bd87901cfd4860d7ecb286e7d52a05",
+      "model.safetensors": "04d27f3400d059fc0cfd7d17dd1909a75bf3ea8fb3eeb48b97cb99e57ee20081"
+    },
+    "license": "apache-2.0",
+    "licence_scope": "general embedding baseline; model card apache-2.0 (the embedded pretrained_cfg.license field says cc-by-nc-4.0; record both, resolve before any production use)"
   }
 }
