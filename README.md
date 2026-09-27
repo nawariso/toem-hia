@@ -7,7 +7,7 @@ A fresh clone runs the mobile app, Go API, PostgreSQL, and authentication **with
 > **LOCAL AUTH IS DEVELOPMENT ONLY. IT MUST NEVER BE ENABLED IN PRODUCTION.**
 > `APP_ENV=production` + `AUTH_MODE=local` is a fatal startup error, and release mobile builds refuse local mode.
 
-Status: REQ-001, REQ-001-B and REQ-002 accepted; Requirement 003 is implemented pending independent review. Native local-auth smoke on a device/emulator is **NOT RUN**; the Requirement 003 camera flow is also **DEVICE VALIDATION — NOT RUN**. Both are mandatory before any public or user pilot. Supabase Auth / Email OTP / real provider JWT are **DEFERRED TO INTEGRATION & PILOT HARDENING** — not tested end to end. See `docs/requirements/001B-local-development-mode.md` and `docs/requirements/003-camera-local-media-foundation.md`.
+Status: REQ-001, REQ-001-B, REQ-002 and REQ-003 accepted. Re-ID has not started. Native local-auth smoke on a device/emulator is **NOT RUN**; the Requirement 003 camera flow is also **DEVICE VALIDATION — NOT RUN**. Both are mandatory before any public or user pilot. Supabase Auth / Email OTP / real provider JWT are **DEFERRED TO INTEGRATION & PILOT HARDENING** — not tested end to end. See `docs/requirements/001B-local-development-mode.md` and `docs/requirements/003-camera-local-media-foundation.md`.
 
 ## Architecture and cost
 

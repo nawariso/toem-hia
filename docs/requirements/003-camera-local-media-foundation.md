@@ -1,16 +1,32 @@
 # Requirement 003 — Camera & Local Media Foundation
 
-Status: **IMPLEMENTED — PENDING INDEPENDENT REVIEW**
+Status: **ACCEPTED** — independent review accepted the implementation and remediation at PR head `afb8edcd39b0b7ec74d0b5516bb7282f767d0186`; GitHub Actions `quality` run 36265292750 (pull_request) green; merged to `main` via PR #3 with a merge commit (`ff9c098990a0b7be57f103bbcf5fcbe4d9beb5fe`) so both reviewed commits remain in history.
 
 | Gate | Status |
 | --- | --- |
-| REQ-003 Camera & Local Media Foundation | IMPLEMENTED — PENDING INDEPENDENT REVIEW |
-| Automated backend/mobile/contracts gates | see PR (local results recorded below) |
+| REQ-003 Camera & Local Media Foundation | ACCEPTED |
+| Automated backend/mobile/contracts gates | PASS — `quality` run 36265292750 (pull_request, PR head) and run 36291661344 (push, merge commit) |
+| Independent review | ACCEPTED |
 | DEVICE VALIDATION (real camera, device or simulator) | **NOT RUN** — mandatory before any public or user pilot |
 | Supabase Auth / Email OTP / real provider JWT | DEFERRED TO INTEGRATION & PILOT HARDENING |
 | Re-ID / identification | NOT STARTED |
 
 Baseline: canonical `main` `b302b576440e0dce23807319a72212d35428b278` (TOEM HIA naming, Stage A).
+
+## Acceptance record
+
+| Item | Value |
+| --- | --- |
+| Implementation commit | `559af6921f394f274a3e425faeede21ada880c5d` |
+| Remediation commit (preserve camera source on failed pending move) | `afb8edcd39b0b7ec74d0b5516bb7282f767d0186` |
+| Pull request | #3 (`feature/req-003-camera-local-media` → `main`) |
+| Pull-request workflow | `quality` run 36265292750 — success |
+| Merge commit | `ff9c098990a0b7be57f103bbcf5fcbe4d9beb5fe` (tree identical to the reviewed PR head) |
+| Merge-commit push workflow | `quality` run 36291661344 — success |
+| Verdict | **REQUIREMENT 003 — ACCEPTED** |
+| DEVICE VALIDATION | **NOT RUN** — mandatory before any public or user pilot |
+| Supabase Auth / Email OTP / real-provider E2E | DEFERRED TO INTEGRATION & PILOT HARDENING |
+| Re-ID / identification | NOT STARTED — to be defined as a separate Re-ID Technical Spike / Identification Foundation requirement from this accepted baseline |
 
 ## Scope
 
@@ -68,11 +84,16 @@ Retry/idempotency: an existing `encounterId` is reused (no second encounter); af
 
 ## Technical debt
 
+Accepted by the independent review; none of it is remediated in Requirement 003.
+
 - No sweeper for files orphaned by a crash between commit and attach.
 - Accepted for the local development adapter: the filesystem publishes the file before metadata is attached transactionally. Application cleanup handles normal attach/database failures, but an ambiguous database commit outcome could theoretically leave file and metadata inconsistent. Before production/shared object storage, design explicit reconciliation or object-state handling appropriate to the chosen storage provider; do not implement distributed transactions or reconciliation here.
 - No `GET` media list/content use in the mobile UI yet (API and contract exist).
 - Local adapter file permissions are POSIX-only; Windows ACLs are inherited.
 - A DRAFT encounter created by a save that is never retried remains a DRAFT.
+- No production media/object-storage adapter yet (`MEDIA_MODE=local` is refused in production; production must use `disabled` until one exists).
+- Pending-capture metadata is in memory and does not survive process termination.
+- Moderate npm advisories remain; the CI gate is `npm audit --audit-level=high`, which they are below.
 
 ## Device validation
 

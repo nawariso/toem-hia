@@ -1,6 +1,6 @@
 # ADR-010: MediaStore and Local Filesystem Development Adapter
 
-Status: Proposed (Requirement 003, pending independent review)
+Status: Accepted (Requirement 003 accepted after independent review; merged via PR #3, merge commit `ff9c098990a0b7be57f103bbcf5fcbe4d9beb5fe`)
 
 ## Context
 
