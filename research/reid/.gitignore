@@ -1,0 +1,25 @@
+# Research environment and caches
+.venv/
+.pytest-tmp/
+.mypy_cache/
+.ruff_cache/
+__pycache__/
+*.egg-info/
+.coverage
+
+# Raw and derived imagery, model weights and feature caches never enter Git
+# (Requirement 004 section 19). Point TOEM_REID_DATA at a directory outside
+# the repository; these entries are a second line of defence.
+data/
+weights/
+cache/
+*.jpg
+*.jpeg
+*.png
+*.heic
+*.npy
+*.npz
+*.pt
+*.pth
+*.safetensors
+*.onnx

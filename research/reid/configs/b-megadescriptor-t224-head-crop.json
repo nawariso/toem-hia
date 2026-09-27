@@ -1,0 +1,15 @@
+{
+  "config_id": "b-megadescriptor-t224-head-crop",
+  "algorithm_family": "B",
+  "model_identifier": "hf-hub:BVRA/MegaDescriptor-T-224",
+  "model_version": "hub revision 3ea58ff6c6195bc748bb86c111ff40c32bdddcba observed 2026-09-27; CC BY-NC 4.0; not yet downloaded",
+  "preprocessing": "head_crop",
+  "max_side": 512,
+  "training_config": null,
+  "seed": 0,
+  "parameters": {
+    "input_size": 224,
+    "device": "cpu",
+    "target_far": 0.05
+  }
+}

@@ -60,3 +60,19 @@ jobs:
       - run: npm audit --audit-level=high
       - name: Type-check shared contracts
         run: ./node_modules/.bin/tsc -p ../../packages/contracts/tsconfig.json
+  research-reid:
+    # Requirement 004 research pipeline (not product code). Pipeline-correctness
+    # tests on synthetic fixtures only; no datasets or model weights in CI.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research/reid
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy
+      - run: uv run pytest
+      - run: uv run toem-reid budget configs/*.json
