@@ -10,6 +10,8 @@ Status: PROPOSED / BLOCKED — DATA ACQUISITION. Research pipeline ACCEPTED (see
 
 Proxy listing: "Other (specified in description)" rather than CC0. Its owner description permits ML/imaging/computer-vision testing and analysis, but imposes reproduction, commercial-use and marine-turtle-biology restrictions.[2] This is not a blanket open licence. Do not download or use in a product-linked study until the use boundary has been reviewed or written permission obtained. The dataset has not been downloaded.
 
+The draft Tier A provenance template is deliberately non-ingestible. The research loader now rejects unknown/pending licence markers and invalid verification dates; this is an entry guard, not a substitute for permission review.
+
 No target-species SEALED TEST consumed, no Family C, no production Identification/Re-ID integration. DEVICE VALIDATION remains NOT RUN. Only a reproducible pipeline exists.
 
 ## Sources
